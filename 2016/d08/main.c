@@ -16,7 +16,7 @@ static void		print(char grid[][WIDTH])
 		x = 0;
 		while (x < WIDTH)
 			cnt += (grid[y][x++] == '1') ? 1 : 0;
-		ft_printf("%.50s|\n", grid[y++]);
+		ft_printf("%.*s|\n", WIDTH,  grid[y++]);
 	}
 	ft_printf("Lit: %d\n", cnt);
 }
