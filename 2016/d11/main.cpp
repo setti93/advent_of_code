@@ -1,21 +1,75 @@
+#include <cstdint>
 #include <fstream>
 #include <iostream>
-#include <set>
+#include <queue>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
-int read(const std::string &filename, std::vector<std::set<int>> &floors) {
-  int tot = 0;
+using byte = std::uint8_t;
+
+class State {
+  std::vector<byte> m_state;
+  char m_elevator;
+
+ public:
+  State(std::vector<byte> &&arr, char floor)
+      : m_state(std::move(arr)), m_elevator{floor} {}
+  State(int elements) : m_state(elements), m_elevator{0} {}
+
+  bool is_valid() {
+    bool single_micro = false;
+    bool generator = false;
+    for (auto i = 0; i < 4; ++i) {
+      auto idx = i * 2;
+      for (auto e : m_state) {
+        if ((e >> idx) & 0x1) generator = true;
+        if (((e >> idx) & 0x3) == 0x2) single_micro = true;
+        if (generator and single_micro) return false;
+      }
+      return true;
+    }
+  }
+
+  bool is_solved() {
+    for (auto e : m_state) {
+      if ((e >> 6) != 0x3) return false;
+    }
+    return true;
+  }
+
+  bool prevoius_floor_empty() {
+    if (m_elevator) {
+      for (auto e : m_state) {
+        if ((e >> (2 * m_elevator)) & 0x3) return false;
+      }
+    }
+    return true;
+  }
+
+  void add_all_double_up(std::queue<State> &q) {
+    bool couple = false;
+    for (int i = 0; i < m_state.size(); ++i) {
+      byte curr = (m_state[i] >> (2 * m_elevator)) & 0x3;
+      if (curr == 0x3 and couple)
+        continue;
+      else
+        couple = true;
+      if (curr & 1) {
+
+      }
+    }
+  }
+};
+
+void read(const std::string &filename, std::vector<byte> &floors) {
   std::ifstream f(filename);
-  if (f.fail())
-    exit(1);
+  if (f.fail()) exit(1);
   std::string line;
-  int count = 10;
+  int count = 0;
+  int floor_n = 0;
   std::unordered_map<std::string, int> elems;
   while (std::getline(f, line)) {
-    floors.emplace_back();
-    auto &floor = floors.back();
     size_t pos = 0;
     while ((pos = line.find(" a ", pos)) != std::string::npos) {
       pos += 3;
@@ -26,55 +80,59 @@ int read(const std::string &filename, std::vector<std::set<int>> &floors) {
       int id;
       if (elems.find(element) == elems.end()) {
         elems[element] = count;
-        count += 10;
+        ++count;
+        floors.push_back(0);
       }
       id = elems[element];
       if (type.find("generator") == std::string::npos)
-        id += 5;
-      floor.emplace(id);
-      ++tot;
+        floors[id] |= (0x2 << (2 * floor_n));
+      else
+        floors[id] |= (0x1 << (2 * floor_n));
     }
+    ++floor_n;
   }
-  return tot;
 }
 
-enum class Go { Up, Down };
-
-bool try_move(std::vector<std::set<int>> &floors, int &e, Go direction,
-              int amount) {
-    
+void run_queue(std::queue<State> &q) {
+  while (q.size()) {
+    auto &current = q.front();
+    if (current.is_solved()) break;
+    if (current.is_valid()) {
+      current.add_all_double_up(q);
+    }
+    q.pop();
+  }
 }
 
 int main(int argc, char **argv) {
   std::string filename;
-  if (argc == 1)
-    filename = "input.txt";
-  if (argc > 2)
-    return 1;
+  if (argc == 1) filename = "input.txt";
+  if (argc > 2) return 1;
   filename = std::string(argv[1]);
-  std::vector<std::set<int>> floors;
-  auto total = read(filename, floors);
-  for (auto &floor : floors) {
-    std::cout << "new f:\n";
-    for (auto &item : floor) {
-      if (item % 10 == 0)
-        std::cout << "  " << item / 10 << "G\n";
+  std::vector<byte> init;
+  read(filename, init);
+  for (auto i = 3; i >= 0; --i) {
+    auto idx = i * 2;
+    int elem = 1;
+    for (auto e : init) {
+      if ((e >> idx) & 0x1)
+        std::cout << "G" << elem;
       else
-        std::cout << "  " << item / 10 << "M\n";
+        std::cout << "..";
+      if ((e >> idx) & 0x2)
+        std::cout << "M" << elem;
+      else
+        std::cout << "..";
+      elem++;
     }
+    std::cout << "\n";
   }
-  int e = 0;
-  while (floors.back().size() != total) {
-    if (try_move(floors, e, Go::Up, 2))
-      ;
-    else if (try_move(floors, e, Go::Up, 1))
-      ;
-    else if (try_move(floors, e, Go::Down, 1))
-      ;
-    else if (try_move(floors, e, Go::Down, 2))
-      ;
-    else
-      break;
+  std::queue<State> queue;
+  queue.emplace(State(std::move(init), 0));
+  if (queue.front().is_valid()) {
+    run_queue(queue);
+  } else {
+    std::cout << "Initial state not vaild\n";
   }
   return 0;
 }
